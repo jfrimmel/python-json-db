@@ -1,3 +1,49 @@
+"""
+Provide a simple single-file-base database.
+
+You can find examples that also work as rudimentary tests of the database in 
+the following section.
+
+A newly created database has no entries in it.
+>>> db = create('test.db')
+>>> len(db.read())
+0
+
+If an data set is inserted, the number of returned rows is incremented by one.
+The database returns exactly the inserted string.
+>>> db.insert('hello, world!')
+>>> len(db.read())
+1
+>>> db.read()[0]
+'hello, world!'
+
+Test the limit option and ensure that the data sets are returned on the right
+order.
+>>> db.insert('2nd string')
+>>> len(db.read())
+2
+>>> len(db.read(1))
+1
+>>> db.read()[0]
+'hello, world!'
+>>> db.read()[1]
+'2nd string'
+
+Ensure that the file object is closed, if the database connection is closed.
+All calls to the public methods of the database object except for disconnect()
+are raising exceptions after that point. disconnect() has no effect in that
+case.
+>>> db.disconnect()
+>>> db.insert('should not be inserted')
+Traceback (most recent call last):
+  ...
+fridb.DBError: Database file is closed
+>>> db.read()
+Traceback (most recent call last):
+  ...
+fridb.DBError: Database file is closed
+>>> db.disconnect()
+"""
 import os
 
 def connect(db_file):
@@ -29,8 +75,7 @@ class FriDB:
         :param fp: A open file object to the database file.
         """
         self._file = fp
-        if self._file.closed:
-            raise DBError('Database file is closed')
+        self._check_fp()
         if _get_file_size(fp) == 0:
             self._create_new_db()
         else:
@@ -46,6 +91,11 @@ class FriDB:
         print('Loading the existing database...')
         # TODO
 
+    def _check_fp(self):
+        """Check, if the file is still open and raise an exception if not."""
+        if self._file.closed:
+            raise DBError('Database file is closed')
+
     def insert(self, object):
         """
         Insert one data set into a row of the database.
@@ -55,6 +105,7 @@ class FriDB:
         The object takes a whole row for its own.
         :param object: The object to store.
         """
+        self._check_fp()
         # TODO
 
     def read(self, limit=0):
@@ -68,9 +119,15 @@ class FriDB:
         :return: An array of strings containing the stored data.
         :rtype: string array
         """
+        self._check_fp()
         if limit < 0:
             raise DBError('Limit less than zero.')
         # TODO
+        return []
+    
+    def disconnect(self):
+        """Disconnect for the database file and close the file object."""
+        self._file.close()
 
 def _get_file_size(fp):
     """Return the size of a file in bytes."""
