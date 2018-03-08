@@ -200,6 +200,7 @@ class FriDB:
         self._file.seek(0)
         self._file.truncate()
         json.dump(self._db, self._file, sort_keys=False, indent=2)
+        self._file.flush()
 
     def _check_fp(self):
         """Check, if the file is still open and raise an exception if not."""
