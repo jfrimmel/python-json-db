@@ -208,11 +208,10 @@ class FriDB:
 
         ret = self._db[table]
         if limit < 0:
-            return ret[limit:].copy()
+            ret = ret[limit:]
         elif limit > 0:
-            return ret[:limit].copy()
-        else:
-            return ret.copy()
+            ret = ret[:limit]
+        return ret.copy()
 
     def disconnect(self):
         """Disconnect for the database file and close the file object."""
