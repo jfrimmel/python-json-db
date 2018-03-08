@@ -1,48 +1,71 @@
 """
 Provide a simple single-file-base database.
 
-You can find examples that also work as rudimentary tests of the database in 
-the following section.
+Usage:
+    The basic usage is very simple: you have to import this module. After that
+    you can either connect to a existing database or create a new one and store
+    the return value in a variable, which you can use to interact with the
+    database. 
+    You can insert data sets and read the existing ones back. You may limit the
+    number of data sets to read using the optional parameter 'limit'.
 
-A newly created database has no entries in it.
->>> db = create('test.db')
->>> len(db.read())
-0
+Example:
+    import fridb
 
-If an data set is inserted, the number of returned rows is incremented by one.
-The database returns exactly the inserted string.
->>> db.insert('hello, world!')
->>> len(db.read())
-1
->>> db.read()[0]
-'hello, world!'
+    db = fridb.create()
+    db.insert('a string')
+    db.insert('a second string')
+    result = db.read()
+    only_the_fist_row = db.read(limit=1)[0]
+    db.disconnect()
 
-Test the limit option and ensure that the data sets are returned on the right
-order.
->>> db.insert('2nd string')
->>> len(db.read())
-2
->>> len(db.read(1))
-1
->>> db.read()[0]
-'hello, world!'
->>> db.read()[1]
-'2nd string'
+Tests:
+    You can find rudimentary tests of the database in this section. Each set of
+    test is prefixed with a short explanation what is tested an why.
 
-Ensure that the file object is closed, if the database connection is closed.
-All calls to the public methods of the database object except for disconnect()
-are raising exceptions after that point. disconnect() has no effect in that
-case.
->>> db.disconnect()
->>> db.insert('should not be inserted')
-Traceback (most recent call last):
-  ...
-fridb.DBError: Database file is closed
->>> db.read()
-Traceback (most recent call last):
-  ...
-fridb.DBError: Database file is closed
->>> db.disconnect()
+    A newly created database has no entries in it.
+    >>> db = create('test.db')
+    >>> len(db.read())
+    0
+    
+    If an data set is inserted, the number of returned rows is incremented by one.
+    The database returns exactly the inserted string.
+    >>> db.insert('hello, world!')
+    >>> len(db.read())
+    1
+    >>> db.read()[0]
+    'hello, world!'
+    
+    Test the limit option and ensure that the data sets are returned on the right
+    order.
+    >>> db.insert('2nd string')
+    >>> len(db.read())
+    2
+    >>> len(db.read(1))
+    1
+    >>> len(db.read(-1))
+    1
+    >>> db.read()[0]
+    'hello, world!'
+    >>> db.read()[1]
+    '2nd string'
+    >>> db.read(-1)[0]
+    '2nd string'
+    
+    Ensure that the file object is closed, if the database connection is closed.
+    All calls to the public methods of the database object except for disconnect()
+    are raising exceptions after that point. disconnect() has no effect in that
+    case.
+    >>> db.disconnect()
+    >>> db.insert('should not be inserted')
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Database file is closed
+    >>> db.read()
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Database file is closed
+    >>> db.disconnect()
 """
 import os
 
@@ -112,16 +135,17 @@ class FriDB:
         """
         Read the entries from the database.
 
-        The method returns an array of up to 'limit' rows. If the limit is zero
-        all rows are returned.
+        The method returns an array of up to 'limit' rows. There are three
+        possible cases for the limit:
+        1. If the limit is zero all rows are returned.
+        2. If the limit is positive the first n rows are returned.
+        3. If the limit is negative the last n rows are returned.
         :param limit: This optional parameter specifies the maximum number of
         rows returned.
         :return: An array of strings containing the stored data.
         :rtype: string array
         """
         self._check_fp()
-        if limit < 0:
-            raise DBError('Limit less than zero.')
         # TODO
         return []
     
