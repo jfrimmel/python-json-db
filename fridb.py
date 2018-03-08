@@ -1,7 +1,7 @@
 """
 Provide a simple single-file-base database.
 
-update() and delete() are missing entirely.
+update() delete(), drop_table() etc. are missing entirely.
 Usage:
     The basic usage is very simple: you have to import this module. After that
     you can either connect to a existing database or create a new one and store
@@ -95,9 +95,12 @@ Tests:
     fridb.DBError: Database file is closed
     >>> db.disconnect()
     
-    TODO: check for existing database
+    The existing database has the same entries as the one before the saving.
     >>> db = connect('test.db')
-    TODO
+    >>> db.read('customers')
+    ['hello, world!', '2nd string', 'item #2']
+    >>> db.read('orders')
+    ['item #1']
 """
 import os
 import json
@@ -105,11 +108,12 @@ import json
 def connect(db_file):
     """Connect to a database file."""
     fp = open(str(db_file), 'a+')
+    fp.seek(0, os.SEEK_SET)
     return FriDB(fp)
 
 def create(db_file):
     """Creates an empty database."""
-    fp = open(str(db_file), 'a+')
+    fp = open(str(db_file), 'w+')
     return FriDB(fp)
 
 class FriDB:
@@ -144,8 +148,22 @@ class FriDB:
 
     def _load_db(self):
         """Load the database from an existing file."""
-        raise NotImplementedError()
-        data = json.load(self._file)
+        okay = True
+        content = self._file.read()
+        #try:
+        self._db = json.loads(content)
+        #except json.JSONDecodeError:
+        #    okay = False
+
+        if not okay:
+            raise DBError('Database file corrupt.')
+
+    def save(self):
+        """Store the database to a file."""
+        self._check_fp()
+        self._file.seek(0)
+        self._file.truncate()
+        json.dump(self._db, self._file, sort_keys=False, indent=2)
 
     def _check_fp(self):
         """Check, if the file is still open and raise an exception if not."""
@@ -215,12 +233,19 @@ class FriDB:
 
     def disconnect(self):
         """Disconnect for the database file and close the file object."""
+        if not self._file.closed:
+            self.save()
         self._file.close()
         self._rows = []
 
 def _get_file_size(fp):
     """Return the size of a file in bytes."""
-    return os.fstat(fp.fileno()).st_size
+    old_file_position = fp.tell()
+    fp.seek(0, os.SEEK_END)
+    size = fp.tell()
+    fp.seek(old_file_position, os.SEEK_SET)
+    return size
+    #return os.fstat(fp.fileno()).st_size
 
 class DBError(Exception):
     """Custom exception thrown from the class FriDB."""
