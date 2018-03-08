@@ -50,12 +50,14 @@ Tests:
     0
 
     A created table increments the number of tables. The table returned has the
-    same name as specified.
+    same name as specified. It is empty after the creation.
     >>> db.create_table('customers')
     >>> db.tables()[0]
     'customers'
     >>> len(db.tables())
     1
+    >>> len(db.read('customers'))
+    0
 
     A new table with the same name as an already existing one raises an
     exception.
@@ -142,7 +144,23 @@ import os
 import json
 
 def connect(db_file):
-    """Connect to a database file."""
+    """
+    Connect to a database file.
+
+    This function tries to open the file 'db_file' in append mode (current
+    content is kept) and sets the read pointer for this file to position 0.
+    This is necessary, because the pointer is initially set to the position of
+    the end of the file in order to write data directly to it without
+    overwriting the existing data. In our case we want to write to the file as
+    well as read from it, so the position is set to the beginning of the file.
+    On success a new object of the class FriDB is created, which can be used
+    to access the database-file. In the case of an error a DBError is raised.
+    Note that the file is created, if it does not exist yet.
+    :param db_file: The file that holds the database.
+    :return: a FriDB object with the database file loaded.
+    :rtype: FriDB
+    :exception DBError: if the file could not be accessed.
+    """
     try:
         fp = open(str(db_file), 'a+')
         fp.seek(0, os.SEEK_SET)
@@ -153,7 +171,18 @@ def connect(db_file):
     raise DBError('Could not access or create the database file.')
 
 def create(db_file):
-    """Creates an empty database."""
+    """
+    Creates an empty database.
+
+    This function creates a new database file in the file specified by the
+    parameter. If a file with that name exists it will be overridden.
+    On success a new object of the class FriDB is created, which can be used
+    to access the database-file. In the case of an error a DBError is raised.
+    :param db_file: The file that should hold the database.
+    :return: a FriDB object with the database file loaded.
+    :rtype: FriDB
+    :exception DBError: if the file could not be accessed.
+    """
     try:
         fp = open(str(db_file), 'w+')
         return FriDB(fp)
@@ -163,7 +192,16 @@ def create(db_file):
     raise DBError('Could not access or create the database file.')
 
 class FriDB:
-    """A simple JSON-based database."""
+    """
+    A simple JSON-based database.
+
+    The class provides methods to operate on a single JSON file. This file
+    holds the entire database with all of its tables and their entries. The
+    database provides no SQL interface but the user can call methods with
+    similar names, which have the same (but mostly reduced) functionality.
+    The class should not be created directly. It's recommended to use one of
+    the two functions 'connect()' or 'create()' from this module.
+    """
 
     def __init__(self, fp):
         """
@@ -193,7 +231,14 @@ class FriDB:
         self._db = {}
 
     def _load_db(self):
-        """Load the database from an existing file."""
+        """
+        Load the database from an existing file.
+
+        The content of the database file is read and assumed as a JSON file and
+        parsed in that way. If the parser succeeds the private variable '_db'
+        is set up with the values of the existing database. On failure a 
+        DBError is raised.
+        """
         okay = True
         content = self._file.read()
         try:
@@ -205,7 +250,19 @@ class FriDB:
             raise DBError('Database file corrupt.')
 
     def save(self):
-        """Store the database to a file."""
+        """
+        Store the database to a file.
+
+        This methods takes the current database content and writes it to the
+        file. The file is flushed afterwards to ensure that the data is not
+        kept in a buffer but is written directly to the file.
+        The data is written in the JSON format, where every table is an top-
+        level item in the JSON and has an array of rows in it.
+
+        It is recommended to call this method from time to time. If not the
+        data is only written on a call to disconnect. If the user do not
+        specify at least on of both calls the data is fully lost.
+        """
         self._check_fp()
         self._file.seek(0)
         self._file.truncate()
@@ -224,7 +281,17 @@ class FriDB:
             raise DBError('Table does not exist.')
 
     def create_table(self, tablename):
-        """Create a new table in the database."""
+        """
+        Create a new table in the database.
+
+        This method creates a new table to store items to in the database. At
+        least one table is required if any data should be stored inside the
+        database.
+        If the table does not exist yet it is created and has no items in it.
+        If a table with the same name exists already a DBError is raised.
+        :param tablename: The name of the table to create.
+        :exception DBError: is raised if the table already exists.
+        """
         self._check_fp()
         table = str(tablename)
         if table in self._db:
@@ -236,7 +303,14 @@ class FriDB:
         return [key for key in self._db.keys()]
 
     def drop_table(self, tablename):
-        """Deletes an entire table with all of its content."""
+        """
+        Delete a table.
+
+        Deletes an entire table with all of its content. The table has to exist
+        in the database.
+        :param tablename: The name of the table to delete.
+        :exception DBError: if the table does not exist.
+        """
         self._check_fp()
         table= str(tablename)
         self._check_table(table)
@@ -266,12 +340,12 @@ class FriDB:
         1. If the limit is zero all rows are returned.
         2. If the limit is positive the first n rows are returned.
         3. If the limit is negative the last n rows are returned.
-        This method only operates on the private variable '_rows', that has to
+        This method only operates on the private variable '_db', that has to
         be up-to-date at every call to read(). The other methods have to ensure
         this.
         :param limit: This optional parameter specifies the maximum number of
         rows returned.
-        :return: An array of strings containing the stored data.
+        :return: An array containing the stored data.
         :rtype: string array
         """
         self._check_fp()
@@ -286,14 +360,42 @@ class FriDB:
         return ret.copy()
 
     def disconnect(self):
-        """Disconnect for the database file and close the file object."""
+        """
+        Disconnect for the database.
+
+        This method closes the connection to the database file. The modified 
+        data since the last call to save() is stored and the file object for
+        the database file is closed. After this call all operations on the
+        object will fail, except the call to this method, which has no effect.
+        The private variable '_db' is set to an empty dictionary in order to
+        prevent the access to the data in the memory after the connection was
+        closed.
+        """
         if not self._file.closed:
             self.save()
         self._file.close()
-        self._rows = []
+        self._db = {}
 
 def _get_file_size(fp):
-    """Return the size of a file in bytes."""
+    """
+    Return the size of a file in bytes.
+
+    The parameter has to be the file pointer to an open file, the size of which
+    should be queried.
+
+    If the file is empty the value 0 is returned (as you would expect).
+    >>> fp = open('test.db', 'w')
+    >>> _get_file_size(fp)
+    0
+    >>> fp.write('Hello World!')
+    12
+    >>> _get_file_size(fp)
+    12
+    >>> fp.close()
+
+    :param fp: The valid file pointer to an open file.
+    :return: The size of the file in bytes.
+    """
     old_file_position = fp.tell()
     fp.seek(0, os.SEEK_END)
     size = fp.tell()
@@ -301,4 +403,19 @@ def _get_file_size(fp):
     return size
 
 class DBError(Exception):
-    """Custom exception thrown from the class FriDB."""
+    """
+    Custom exception for the FriDB.
+    
+    This class is an exception that is thrown by the class FriDB. Note that the
+    class itself is only derived from the class Exception and has an empty body.
+
+    It may or may not have a message.
+    >>> raise DBError
+    Traceback (most recent call last):
+      ...
+    fridb.DBError
+    >>> raise DBError('Test exception')
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Test exception
+    """
