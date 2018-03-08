@@ -143,14 +143,24 @@ import json
 
 def connect(db_file):
     """Connect to a database file."""
-    fp = open(str(db_file), 'a+')
-    fp.seek(0, os.SEEK_SET)
-    return FriDB(fp)
+    try:
+        fp = open(str(db_file), 'a+')
+        fp.seek(0, os.SEEK_SET)
+        return FriDB(fp)
+    except:
+        # pass to prevent exception during exception handling
+        pass
+    raise DBError('Could not access or create the database file.')
 
 def create(db_file):
     """Creates an empty database."""
-    fp = open(str(db_file), 'w+')
-    return FriDB(fp)
+    try:
+        fp = open(str(db_file), 'w+')
+        return FriDB(fp)
+    except:
+        # pass to prevent exception during exception handling
+        pass
+    raise DBError('Could not access or create the database file.')
 
 class FriDB:
     """A simple JSON-based database."""
