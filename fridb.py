@@ -1,7 +1,22 @@
 """
 Provide a simple single-file-base database.
 
-update() delete(), drop_table() etc. are missing entirely.
+This module allows a very simple interface to a single-file-database. The
+entire data is stored in one JSON file.
+The provided interface to the database is similar to some of the common SQL
+commands, but keep in mind, that it is in fact no SQL database.
+There are several simple methods, that operate on the data. Those are:
+* create(): create a new database
+* connect(): connect to an existing database
+* disconnect(): closes the connection to the database. All data is stored.
+* create_table(): create a new table in the database
+* drop_table(): delete a table with all of its entries
+* tables(): return a list of all tables
+* insert(): insert a data set into a table
+* read(): query data sets from a table
+* save(): save the memory to the file. Automatically called on disconnect().
+
+update(), delete() etc. are missing entirely.
 Usage:
     The basic usage is very simple: you have to import this module. After that
     you can either connect to a existing database or create a new one and store
@@ -11,7 +26,19 @@ Usage:
     number of data sets to read using the optional parameter 'limit'.
 
 Example:
-    TODO
+    import fridb
+
+    db = fridb.create('test.db')
+    db.create_table('test')
+    db.insert('test', 'item #1')
+    db.insert('test', 'item #2')
+    db.save()
+    db.insert('test', 'item #3')
+    db.disconnect()
+
+    db = fridb.connect('test.db')
+    print(db.tables())
+    print(db.read('test'))
 
 Tests:
     You can find rudimentary tests of the database in this section. Each set of
@@ -101,6 +128,15 @@ Tests:
     ['hello, world!', '2nd string', 'item #2']
     >>> db.read('orders')
     ['item #1']
+
+    A table can be dropped. The table and its content is no more available.
+    >>> db.drop_table('orders')
+    >>> db.tables()
+    ['customers']
+    >>> db.read('orders')
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Table does not exist.
 """
 import os
 import json
@@ -150,10 +186,10 @@ class FriDB:
         """Load the database from an existing file."""
         okay = True
         content = self._file.read()
-        #try:
-        self._db = json.loads(content)
-        #except json.JSONDecodeError:
-        #    okay = False
+        try:
+            self._db = json.loads(content)
+        except json.JSONDecodeError:
+            okay = False
 
         if not okay:
             raise DBError('Database file corrupt.')
@@ -187,6 +223,13 @@ class FriDB:
     def tables(self):
         """Return a list of all existing tables."""
         return [key for key in self._db.keys()]
+
+    def drop_table(self, tablename):
+        """Deletes an entire table with all of its content."""
+        self._check_fp()
+        table= str(tablename)
+        self._check_table(table)
+        del self._db[table]
 
     def insert(self, table, object):
         """
@@ -245,7 +288,6 @@ def _get_file_size(fp):
     size = fp.tell()
     fp.seek(old_file_position, os.SEEK_SET)
     return size
-    #return os.fstat(fp.fileno()).st_size
 
 class DBError(Exception):
     """Custom exception thrown from the class FriDB."""
