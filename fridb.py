@@ -66,8 +66,12 @@ Tests:
       ...
     fridb.DBError: Database file is closed
     >>> db.disconnect()
+    
+    
+    >>> db = connect('test.db')
 """
 import os
+import json
 
 def connect(db_file):
     """Connect to a database file."""
@@ -99,6 +103,7 @@ class FriDB:
         """
         self._file = fp
         self._check_fp()
+        self._rows = None
         if _get_file_size(fp) == 0:
             self._create_new_db()
         else:
@@ -106,12 +111,12 @@ class FriDB:
 
     def _create_new_db(self):
         """Create a new database into an empty file."""
-        print('Creating a new database...')
-        # TODO
+        self._rows = []
 
     def _load_db(self):
         """Load the database from an existing file."""
-        print('Loading the existing database...')
+        data = json.load(self._file)
+        print(data)
         # TODO
 
     def _check_fp(self):
@@ -129,7 +134,7 @@ class FriDB:
         :param object: The object to store.
         """
         self._check_fp()
-        # TODO
+        self._rows.append(object)
 
     def read(self, limit=0):
         """
@@ -146,8 +151,12 @@ class FriDB:
         :rtype: string array
         """
         self._check_fp()
-        # TODO
-        return []
+        if limit < 0:
+            return self._rows.copy()[limit:]
+        elif limit > 0:
+            return self._rows.copy()[:limit]
+        else:
+            return self._rows.copy()
     
     def disconnect(self):
         """Disconnect for the database file and close the file object."""
