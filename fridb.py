@@ -1,6 +1,7 @@
 """
 Provide a simple single-file-base database.
 
+update() and delete() are missing entirely.
 Usage:
     The basic usage is very simple: you have to import this module. After that
     you can either connect to a existing database or create a new one and store
@@ -10,14 +11,7 @@ Usage:
     number of data sets to read using the optional parameter 'limit'.
 
 Example:
-    import fridb
-
-    db = fridb.create()
-    db.insert('a string')
-    db.insert('a second string')
-    result = db.read()
-    only_the_fist_row = db.read(limit=1)[0]
-    db.disconnect()
+    TODO
 
 Tests:
     You can find rudimentary tests of the database in this section. Each set of
@@ -25,50 +19,85 @@ Tests:
 
     A newly created database has no entries in it.
     >>> db = create('test.db')
-    >>> len(db.read())
+    >>> len(db.tables())
     0
-    
-    If an data set is inserted, the number of returned rows is incremented by one.
-    The database returns exactly the inserted string.
-    >>> db.insert('hello, world!')
-    >>> len(db.read())
+
+    A created table increments the number of tables. The table returned has the
+    same name as specified.
+    >>> db.create_table('customers')
+    >>> db.tables()[0]
+    'customers'
+    >>> len(db.tables())
     1
-    >>> db.read()[0]
+
+    A new table with the same name as an already existing one raises an
+    exception.
+    >>> db.create_table('customers')
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Table already exists.
+
+    If an data set is inserted, the number of returned rows is incremented by
+    one. The database returns exactly the inserted string.
+    >>> db.insert('customers', 'hello, world!')
+    >>> len(db.read('customers'))
+    1
+    >>> db.read('customers')[0]
     'hello, world!'
-    
-    Test the limit option and ensure that the data sets are returned on the right
-    order.
-    >>> db.insert('2nd string')
-    >>> len(db.read())
+
+    You can neither read from or write to an non-existing table.
+    >>> db.insert('non-existing table', 'data')
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Table does not exist.
+    >>> db.read('non-existing table')
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Table does not exist.
+
+    Test the limit option and ensure that the data sets are returned on the
+    right order.
+    >>> db.insert('customers', '2nd string')
+    >>> len(db.read('customers'))
     2
-    >>> len(db.read(1))
+    >>> len(db.read('customers', 1))
     1
-    >>> len(db.read(-1))
+    >>> len(db.read('customers', -1))
     1
-    >>> db.read()[0]
+    >>> db.read('customers')[0]
     'hello, world!'
-    >>> db.read()[1]
+    >>> db.read('customers')[1]
     '2nd string'
-    >>> db.read(-1)[0]
+    >>> db.read('customers', -1)[0]
     '2nd string'
-    
+
+    The data is inserted in the right table.
+    >>> db.create_table('orders')
+    >>> db.insert('orders', 'item #1')
+    >>> db.insert('customers', 'item #2')
+    >>> db.read('orders', limit=-1)[0]
+    'item #1'
+    >>> db.read('customers', limit=-1)[0]
+    'item #2'
+
     Ensure that the file object is closed, if the database connection is closed.
     All calls to the public methods of the database object except for disconnect()
     are raising exceptions after that point. disconnect() has no effect in that
     case.
     >>> db.disconnect()
-    >>> db.insert('should not be inserted')
+    >>> db.insert('customers', 'should not be inserted')
     Traceback (most recent call last):
       ...
     fridb.DBError: Database file is closed
-    >>> db.read()
+    >>> db.read('customers')
     Traceback (most recent call last):
       ...
     fridb.DBError: Database file is closed
     >>> db.disconnect()
     
-    
+    TODO: check for existing database
     >>> db = connect('test.db')
+    TODO
 """
 import os
 import json
@@ -103,7 +132,7 @@ class FriDB:
         """
         self._file = fp
         self._check_fp()
-        self._rows = None
+        self._db = None
         if _get_file_size(fp) == 0:
             self._create_new_db()
         else:
@@ -111,32 +140,52 @@ class FriDB:
 
     def _create_new_db(self):
         """Create a new database into an empty file."""
-        self._rows = []
+        self._db = {}
 
     def _load_db(self):
         """Load the database from an existing file."""
+        raise NotImplementedError()
         data = json.load(self._file)
-        print(data)
-        # TODO
 
     def _check_fp(self):
         """Check, if the file is still open and raise an exception if not."""
         if self._file.closed:
             raise DBError('Database file is closed')
 
-    def insert(self, object):
+    def _check_table(self, table):
+        """Raise a DBError if the table doesn't exist."""
+        key = str(table)
+        if key not in self._db:
+            raise DBError('Table does not exist.')
+
+    def create_table(self, tablename):
+        """Create a new table in the database."""
+        self._check_fp()
+        table = str(tablename)
+        if table in self._db:
+            raise DBError('Table already exists.')
+        self._db[table] = []
+
+    def tables(self):
+        """Return a list of all existing tables."""
+        return [key for key in self._db.keys()]
+
+    def insert(self, table, object):
         """
         Insert one data set into a row of the database.
 
         The object is inserted as a string, so if you want to store an object,
         you will have to serialize it before (e.g. using the JSON format).
         The object takes a whole row for its own.
+        :param table: The table to store the entry into.
         :param object: The object to store.
         """
         self._check_fp()
-        self._rows.append(object)
+        table = str(table)
+        self._check_table(table)
+        self._db[table].append(object)
 
-    def read(self, limit=0):
+    def read(self, table, limit=0):
         """
         Read the entries from the database.
 
@@ -145,22 +194,30 @@ class FriDB:
         1. If the limit is zero all rows are returned.
         2. If the limit is positive the first n rows are returned.
         3. If the limit is negative the last n rows are returned.
+        This method only operates on the private variable '_rows', that has to
+        be up-to-date at every call to read(). The other methods have to ensure
+        this.
         :param limit: This optional parameter specifies the maximum number of
         rows returned.
         :return: An array of strings containing the stored data.
         :rtype: string array
         """
         self._check_fp()
+        table = str(table)
+        self._check_table(table)
+
+        ret = self._db[table]
         if limit < 0:
-            return self._rows.copy()[limit:]
+            return ret[limit:].copy()
         elif limit > 0:
-            return self._rows.copy()[:limit]
+            return ret[:limit].copy()
         else:
-            return self._rows.copy()
-    
+            return ret.copy()
+
     def disconnect(self):
         """Disconnect for the database file and close the file object."""
         self._file.close()
+        self._rows = []
 
 def _get_file_size(fp):
     """Return the size of a file in bytes."""
