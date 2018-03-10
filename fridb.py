@@ -16,12 +16,11 @@ There are several simple methods, that operate on the data. Those are:
 * read(): query data sets from a table
 * save(): save the memory to the file. Automatically called on disconnect().
 
-update(), delete() etc. are missing entirely.
 Usage:
     The basic usage is very simple: you have to import this module. After that
     you can either connect to a existing database or create a new one and store
     the return value in a variable, which you can use to interact with the
-    database. 
+    database.
     You can insert data sets and read the existing ones back. You may limit the
     number of data sets to read using the optional parameter 'limit'.
 
@@ -139,10 +138,10 @@ Tests:
     >>> db.read('customers', limit=-1)[0]
     'item #2'
 
-    Ensure that the file object is closed, if the database connection is closed.
-    All calls to the public methods of the database object except for disconnect()
-    are raising exceptions after that point. disconnect() has no effect in that
-    case.
+    Ensure that the file object is closed, if the database connection is
+    closed. All calls to the public methods of the database object except for
+    disconnect() are raising exceptions after that point. disconnect() has no
+    effect in that case.
     >>> db.disconnect()
     >>> db.insert('customers', 'should not be inserted')
     Traceback (most recent call last):
@@ -153,7 +152,7 @@ Tests:
       ...
     fridb.DBError: Database file is closed
     >>> db.disconnect()
-    
+
     The existing database has the same entries as the one before the saving.
     >>> db = connect('test.db')
     >>> db.read('customers')
@@ -196,7 +195,7 @@ Tests:
     Traceback (most recent call last):
       ...
     fridb.DBError: Table does not exist.
-    
+
     The database has to be capable of storing at least 10,000 data sets in a
     single table. The following lines first create a list with 20,000 entries,
     then stores the list entries on after another. After that the database is
@@ -224,7 +223,7 @@ Tests:
 """
 import os
 import json
-from _operator import itemgetter
+
 
 def connect(db_file):
     """
@@ -250,14 +249,15 @@ def connect(db_file):
         if not os.path.isfile(str(db_file)):
             raise FileNotFoundError('File could not be created')
         return FriDB(fp)
-    except:
+    except (FileNotFoundError, IOError, OSError):
         # pass to prevent exception during exception handling
         pass
     raise DBError('Could not access or create the database file.')
 
+
 def create(db_file):
     """
-    Creates an empty database.
+    Create an empty database.
 
     This function creates a new database file in the file specified by the
     parameter. If a file with that name exists it will be overridden.
@@ -273,10 +273,11 @@ def create(db_file):
         if not os.path.isfile(str(db_file)):
             raise FileNotFoundError('File could not be created')
         return FriDB(fp)
-    except:
+    except (FileNotFoundError, IOError, OSError):
         # pass to prevent exception during exception handling
         pass
     raise DBError('Could not access or create the database file.')
+
 
 class FriDB:
     """
@@ -288,17 +289,21 @@ class FriDB:
     similar names, which have the same (but mostly reduced) functionality.
     The class should not be created directly. It's recommended to use one of
     the two functions 'connect()' or 'create()' from this module.
+
+    Note that every method of this class, except for disconnect, may raise an
+    DBError if the file-object, that is used in the database, is closed. This
+    exception is not listed in the method descriptions!
     """
 
     def __init__(self, fp):
         """
         Construct the database object.
-        
+
         This method takes an open file pointer. At first it checks, if the
         passed parameter is in fact open and raises an exception if not. If the
         file is open and the file-size is zero a new database file is created,
         otherwise the existing one is loaded.
-        
+
         Note, that it is recommended to use one of the two functions
         'fridb.connect()' or 'fridb.create()' instead of creating an object of
         this class directly. Those two functions do everything needed to have
@@ -325,11 +330,15 @@ class FriDB:
 
         The content of the database file is read and assumed as a JSON file and
         parsed in that way. If the parser succeeds the private variable '_db'
-        is set up with the values of the existing database. On failure a 
+        is set up with the values of the existing database. On failure a
         DBError is raised.
+        The highest ID in every table is set up in the list that stores the
+        currently highest ID per table.
         The JSON is directly loaded into the _db variable, but it cannot
         differentiate between tuples and lists, so the tuple of ID and content
         has to be restored manually.
+        :exception DBError: if the database file could not be decoded. The file
+        is assumed to be corrupt in that case.
         """
         okay = True
         content = self._file.read()
@@ -371,7 +380,7 @@ class FriDB:
         self._file.flush()
 
     def _check_fp(self):
-        """Check, if the file is still open and raise an exception if not."""
+        """Check, if the file is still open and raise a DBError if not."""
         if self._file.closed:
             raise DBError('Database file is closed')
 
@@ -380,6 +389,10 @@ class FriDB:
         key = str(table)
         if key not in self._db:
             raise DBError('Table does not exist.')
+
+    def _is_id_in_table(self, id, table):
+        """Return whether a given ID is in the given table."""
+        return len([item for item in self._db[table] if item[0] == id]) != 0
 
     def create_table(self, tablename):
         """
@@ -414,7 +427,7 @@ class FriDB:
         :exception DBError: if the table does not exist.
         """
         self._check_fp()
-        table= str(tablename)
+        table = str(tablename)
         self._check_table(table)
         del self._db[table]
 
@@ -425,6 +438,8 @@ class FriDB:
         The object is inserted as a string, so if you want to store an object,
         you will have to serialize it before (e.g. using the JSON format).
         The object takes a whole row for its own.
+        The ID for the new row is the highest ID that was given in this session
+        plus one.
         :param table: The table to store the entry into.
         :param object: The object to store.
         """
@@ -433,7 +448,7 @@ class FriDB:
         self._check_table(table)
         self._db[table].append((self._highest_id[table] + 1, object))
         self._highest_id[table] += 1
- 
+
     def update(self, table, id, data):
         """
         Update an existing row with new data.
@@ -443,11 +458,13 @@ class FriDB:
         :param table: The table to store the entry into.
         :param id: The ID of the entry to modify.
         :param data: The data that should be written.
+        :exception DBError: if the ID is not in the table or the table doesn't
+        exists.
         """
         self._check_fp()
         table = str(table)
         self._check_table(table)
-        if len([item for item in self._db[table] if item[0] == id]) == 0:
+        if not self._is_id_in_table(id, table):
             raise DBError('Modifying of an entry that is not in the database.')
         self._db[table] = [
             row if row[0] != id else (id, data) for row in self._db[table]
@@ -489,6 +506,7 @@ class FriDB:
         Read the entries from the database.
 
         This function is similar to select(), but the IDs are not returned.
+        The IDs are stripped and only the data in each row is stored in a list.
         :param table: the table to read from.
         :param limit: This optional parameter specifies the maximum number of
         rows returned.
@@ -497,19 +515,22 @@ class FriDB:
         """
         rows = self.select(table, limit)
         return [row for _, row in rows]
-    
+
     def delete(self, table, id):
         """
-        Deletes an entry from a table.
+        Delete an entry from a table.
 
-        
+        This method removes a row with a given ID from the database. The same
+        circumstances as by insert() apply.
         :param table: The table to delete the entry from.
         :param id: The ID of the entry, that should be deleted.
+        :exception DBError: if the ID is not in the table or the table doesn't
+        exists.
         """
         self._check_fp()
         table = str(table)
         self._check_table(table)
-        if len([item for item in self._db[table] if item[0] == id]) == 0:
+        if not self._is_id_in_table(id, table):
             raise DBError('Deleting an entry that doesn\'t exist.')
         self._db[table] = [row for row in self._db[table] if row[0] != id]
 
@@ -517,7 +538,7 @@ class FriDB:
         """
         Disconnect for the database.
 
-        This method closes the connection to the database file. The modified 
+        This method closes the connection to the database file. The modified
         data since the last call to save() is stored and the file object for
         the database file is closed. After this call all operations on the
         object will fail, except the call to this method, which has no effect.
@@ -529,6 +550,7 @@ class FriDB:
             self.save()
         self._file.close()
         self._db = {}
+
 
 def _get_file_size(fp):
     """
@@ -557,12 +579,14 @@ def _get_file_size(fp):
     fp.seek(old_file_position, os.SEEK_SET)
     return size
 
+
 class DBError(Exception):
     """
     Custom exception for the FriDB.
-    
+
     This class is an exception that is thrown by the class FriDB. Note that the
-    class itself is only derived from the class Exception and has an empty body.
+    class itself is only derived from the class Exception and has an empty
+    body.
 
     It may or may not have a message.
     >>> raise DBError
