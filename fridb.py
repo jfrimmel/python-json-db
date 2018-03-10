@@ -244,11 +244,11 @@ def connect(db_file):
     :exception DBError: if the file could not be accessed.
     """
     try:
-        fp = open(str(db_file), 'a+')
-        fp.seek(0, os.SEEK_SET)
+        file_pointer = open(str(db_file), 'a+')
+        file_pointer.seek(0, os.SEEK_SET)
         if not os.path.isfile(str(db_file)):
             raise FileNotFoundError('File could not be created')
-        return FriDB(fp)
+        return FriDB(file_pointer)
     except (FileNotFoundError, IOError, OSError):
         # pass to prevent exception during exception handling
         pass
@@ -269,10 +269,10 @@ def create(db_file):
     :exception DBError: if the file could not be accessed.
     """
     try:
-        fp = open(str(db_file), 'w+')
+        file_pointer = open(str(db_file), 'w+')
         if not os.path.isfile(str(db_file)):
             raise FileNotFoundError('File could not be created')
-        return FriDB(fp)
+        return FriDB(file_pointer)
     except (FileNotFoundError, IOError, OSError):
         # pass to prevent exception during exception handling
         pass
@@ -390,9 +390,9 @@ class FriDB:
         if key not in self._db:
             raise DBError('Table does not exist.')
 
-    def _is_id_in_table(self, id, table):
+    def _is_id_in_table(self, row_id, table):
         """Return whether a given ID is in the given table."""
-        return len([item for item in self._db[table] if item[0] == id]) != 0
+        return len([i for i in self._db[table] if i[0] == row_id]) != 0
 
     def create_table(self, tablename):
         """
@@ -431,32 +431,32 @@ class FriDB:
         self._check_table(table)
         del self._db[table]
 
-    def insert(self, table, object):
+    def insert(self, table, data):
         """
         Insert one data set into a row of the database.
 
-        The object is inserted as a string, so if you want to store an object,
+        The data is inserted as a string, so if you want to store an object,
         you will have to serialize it before (e.g. using the JSON format).
         The object takes a whole row for its own.
         The ID for the new row is the highest ID that was given in this session
         plus one.
         :param table: The table to store the entry into.
-        :param object: The object to store.
+        :param data: The data to store.
         """
         self._check_fp()
         table = str(table)
         self._check_table(table)
-        self._db[table].append((self._highest_id[table] + 1, object))
+        self._db[table].append((self._highest_id[table] + 1, data))
         self._highest_id[table] += 1
 
-    def update(self, table, id, data):
+    def update(self, table, row_id, data):
         """
         Update an existing row with new data.
 
         The row has to be existent. It is identified over the ID of the row,
         which can be queried using select().
         :param table: The table to store the entry into.
-        :param id: The ID of the entry to modify.
+        :param row_id: The ID of the entry to modify.
         :param data: The data that should be written.
         :exception DBError: if the ID is not in the table or the table doesn't
         exists.
@@ -464,10 +464,11 @@ class FriDB:
         self._check_fp()
         table = str(table)
         self._check_table(table)
-        if not self._is_id_in_table(id, table):
+        if not self._is_id_in_table(row_id, table):
             raise DBError('Modifying of an entry that is not in the database.')
         self._db[table] = [
-            row if row[0] != id else (id, data) for row in self._db[table]
+            row if row[0] != row_id else (row_id, data)
+            for row in self._db[table]
         ]
 
     def select(self, table, limit=0):
@@ -516,23 +517,23 @@ class FriDB:
         rows = self.select(table, limit)
         return [row for _, row in rows]
 
-    def delete(self, table, id):
+    def delete(self, table, row_id):
         """
         Delete an entry from a table.
 
         This method removes a row with a given ID from the database. The same
         circumstances as by insert() apply.
         :param table: The table to delete the entry from.
-        :param id: The ID of the entry, that should be deleted.
+        :param row_id: The ID of the entry, that should be deleted.
         :exception DBError: if the ID is not in the table or the table doesn't
         exists.
         """
         self._check_fp()
         table = str(table)
         self._check_table(table)
-        if not self._is_id_in_table(id, table):
+        if not self._is_id_in_table(row_id, table):
             raise DBError('Deleting an entry that doesn\'t exist.')
-        self._db[table] = [row for row in self._db[table] if row[0] != id]
+        self._db[table] = [row for row in self._db[table] if row[0] != row_id]
 
     def disconnect(self):
         """
@@ -552,7 +553,7 @@ class FriDB:
         self._db = {}
 
 
-def _get_file_size(fp):
+def _get_file_size(file_pointer):
     """
     Return the size of a file in bytes.
 
@@ -560,23 +561,23 @@ def _get_file_size(fp):
     should be queried.
 
     If the file is empty the value 0 is returned (as you would expect).
-    >>> fp = open('python.doctest', 'w')
-    >>> _get_file_size(fp)
+    >>> file_pointer = open('python.doctest', 'w')
+    >>> _get_file_size(file_pointer)
     0
-    >>> bytes_written = fp.write('Hello World!')
-    >>> _get_file_size(fp) == bytes_written
+    >>> bytes_written = file_pointer.write('Hello World!')
+    >>> _get_file_size(file_pointer) == bytes_written
     True
-    >>> fp.close()
+    >>> file_pointer.close()
     >>> import os
     >>> os.remove('python.doctest')
 
-    :param fp: The valid file pointer to an open file.
+    :param file_pointer: The valid file pointer to an open file.
     :return: The size of the file in bytes.
     """
-    old_file_position = fp.tell()
-    fp.seek(0, os.SEEK_END)
-    size = fp.tell()
-    fp.seek(old_file_position, os.SEEK_SET)
+    old_file_position = file_pointer.tell()
+    file_pointer.seek(0, os.SEEK_END)
+    size = file_pointer.tell()
+    file_pointer.seek(old_file_position, os.SEEK_SET)
     return size
 
 
