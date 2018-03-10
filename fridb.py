@@ -159,6 +159,11 @@ Tests:
     ...     return returned_entries == entries
     >>> test_10thousand_entires()
     True
+
+    This is not a test. The following two statements clean up the test
+    environment.
+    >>> import os
+    >>> os.remove('test.db')
 """
 import os
 import json
@@ -408,14 +413,15 @@ def _get_file_size(fp):
     should be queried.
 
     If the file is empty the value 0 is returned (as you would expect).
-    >>> fp = open('test.db', 'w')
+    >>> fp = open('python.doctest', 'w')
     >>> _get_file_size(fp)
     0
-    >>> fp.write('Hello World!')
-    12
-    >>> _get_file_size(fp)
-    12
+    >>> bytes_written = fp.write('Hello World!')
+    >>> _get_file_size(fp) == bytes_written
+    True
     >>> fp.close()
+    >>> import os
+    >>> os.remove('python.doctest')
 
     :param fp: The valid file pointer to an open file.
     :return: The size of the file in bytes.
