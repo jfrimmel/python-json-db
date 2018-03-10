@@ -203,7 +203,7 @@ Tests:
     read and the two lists (the original and the one returned from the read())
     have to be equal. Every 1000 entries the list is stored and reloaded to
     simulate the disk-I/O.
-    >>> def test_10thousand_entires():
+    >>> def test_10thousand_entries():
     ...     db = create('test.db')
     ...     db.create_table('test')
     ...     entries = [i for i in range(20000)]
@@ -214,7 +214,7 @@ Tests:
     ...     returned_entries = db.read('test')
     ...     db.disconnect()
     ...     return returned_entries == entries
-    >>> test_10thousand_entires()
+    >>> test_10thousand_entries()
     True
 
     This is not a test. The following two statements clean up the test
