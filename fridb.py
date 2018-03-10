@@ -100,6 +100,10 @@ Tests:
     >>> db.read('customers', -1)[0]
     '2nd string'
 
+    Select returns the ID and the data as a tuple. The IDs start with zero.
+    >>> db.select('customers')
+    [(0, 'hello, world!'), (1, '2nd string')]
+
     The data is inserted in the right table.
     >>> db.create_table('orders')
     >>> db.insert('orders', 'item #1')
@@ -358,11 +362,11 @@ class FriDB:
         self._check_fp()
         table = str(table)
         self._check_table(table)
-        self._db[table].append(object)
+        self._db[table].append((len(self._db[table]), object))
 
-    def read(self, table, limit=0):
+    def select(self, table, limit=0):
         """
-        Read the entries from the database.
+        Select the entries from the database.
 
         The method returns an array of up to 'limit' rows. There are three
         possible cases for the limit:
@@ -372,10 +376,12 @@ class FriDB:
         This method only operates on the private variable '_db', that has to
         be up-to-date at every call to read(). The other methods have to ensure
         this.
+        The difference to read() is that this function returns a tuple
+        containing the ID and the data, whereas read() does not.
         :param limit: This optional parameter specifies the maximum number of
         rows returned.
-        :return: An array containing the stored data.
-        :rtype: string array
+        :return: An array of tuples containing the ID and the stored data.
+        :rtype: tuple array (id, content)
         """
         self._check_fp()
         table = str(table)
@@ -387,6 +393,19 @@ class FriDB:
         elif limit > 0:
             ret = ret[:limit]
         return ret.copy()
+
+    def read(self, table, limit=0):
+        """
+        Read the entries from the database.
+
+        This function is similar to select(), but the IDs are not returned.
+        :param limit: This optional parameter specifies the maximum number of
+        rows returned.
+        :return: An array containing the stored data.
+        :rtype: string array
+        """
+        rows = self.select(table, limit)
+        return [row for _, row in rows]
 
     def disconnect(self):
         """
