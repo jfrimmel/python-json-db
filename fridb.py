@@ -104,6 +104,28 @@ Tests:
     >>> db.select('customers')
     [(0, 'hello, world!'), (1, '2nd string')]
 
+    Select raises an DBError if a non-existing table should be queried.
+    >>> db.select('no such table')
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Table does not exist.
+
+    Update updates the right entry.
+    >>> db.update('customers', 1, 'a new string')
+    >>> db.select('customers')
+    [(0, 'hello, world!'), (1, 'a new string')]
+
+    Update raises an DBError if a non-existing table should be updated or if
+    the ID to update is non-existent.
+    >>> db.update('no such table', 0, '')
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Table does not exist.
+    >>> db.update('customers', 2, 'a newer string')
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Modifying of an entry that is not in the database
+
     The data is inserted in the right table.
     >>> db.create_table('orders')
     >>> db.insert('orders', 'item #1')
@@ -131,7 +153,7 @@ Tests:
     The existing database has the same entries as the one before the saving.
     >>> db = connect('test.db')
     >>> db.read('customers')
-    ['hello, world!', '2nd string', 'item #2']
+    ['hello, world!', 'a new string', 'item #2']
     >>> db.read('orders')
     ['item #1']
 
@@ -363,6 +385,23 @@ class FriDB:
         table = str(table)
         self._check_table(table)
         self._db[table].append((len(self._db[table]), object))
+ 
+    def update(self, table, id, data):
+        """
+        Update an existing row with new data.
+
+        The row has to be existent. It is identified over the ID of the row,
+        which can be queried using select().
+        :param table: The table to store the entry into.
+        :param id: The ID of the entry to modify.
+        :param data: The data that should be written.
+        """
+        self._check_fp()
+        table = str(table)
+        self._check_table(table)
+        if id >= len(self._db[table]):
+            raise DBError('Modifying of an entry that is not in the database')
+        self._db[table][id] = (id, data)
 
     def select(self, table, limit=0):
         """
