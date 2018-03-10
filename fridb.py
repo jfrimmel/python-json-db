@@ -139,6 +139,26 @@ Tests:
     Traceback (most recent call last):
       ...
     fridb.DBError: Table does not exist.
+    
+    The database has to be capable of storing at least 10,000 data sets in a
+    single table. The following lines first create a list with 20,000 entries,
+    then stores the list entries on after another. After that the database is
+    read and the two lists (the original and the one returned from the read())
+    have to be equal. Every 1000 entries the list is stored and reloaded to
+    simulate the disk-I/O.
+    >>> def test_10thousand_entires():
+    ...     db = create('test.db')
+    ...     db.create_table('test')
+    ...     entries = [i for i in range(20000)]
+    ...     for index, entry in enumerate(entries):
+    ...         if index % 1000 == 0:
+    ...             db.save()
+    ...         db.insert('test', entry)
+    ...     returned_entries = db.read('test')
+    ...     db.disconnect()
+    ...     return returned_entries == entries
+    >>> test_10thousand_entires()
+    True
 """
 import os
 import json
@@ -164,6 +184,8 @@ def connect(db_file):
     try:
         fp = open(str(db_file), 'a+')
         fp.seek(0, os.SEEK_SET)
+        if not os.path.isfile(str(db_file)):
+            raise FileNotFoundError('File could not be created')
         return FriDB(fp)
     except:
         # pass to prevent exception during exception handling
@@ -185,6 +207,8 @@ def create(db_file):
     """
     try:
         fp = open(str(db_file), 'w+')
+        if not os.path.isfile(str(db_file)):
+            raise FileNotFoundError('File could not be created')
         return FriDB(fp)
     except:
         # pass to prevent exception during exception handling
