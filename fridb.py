@@ -178,9 +178,15 @@ Tests:
     Traceback (most recent call last):
       ...
     fridb.DBError: Deleting an entry that doesn't exist.
-    >>> db.delete('customers', 2)
+    >>> db.delete('customers', 0)
     >>> db.select('customers')
-    [(0, 'hello, world!')]
+    [(2, 'item #2')]
+
+    Update and insert are both working even after the deletion of any items.
+    >>> db.update('customers', 2, 'new item #2')
+    >>> db.insert('customers', 'item #3')
+    >>> db.select('customers')
+    [(2, 'new item #2'), (3, 'item #3')]
 
     A table can be dropped. The table and its content is no more available.
     >>> db.drop_table('orders')
@@ -443,7 +449,9 @@ class FriDB:
         self._check_table(table)
         if len([item for item in self._db[table] if item[0] == id]) == 0:
             raise DBError('Modifying of an entry that is not in the database.')
-        self._db[table][id] = (id, data)
+        self._db[table] = [
+            row if row[0] != id else (id, data) for row in self._db[table]
+        ]
 
     def select(self, table, limit=0):
         """
