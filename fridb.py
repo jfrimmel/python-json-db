@@ -441,8 +441,8 @@ class FriDB:
         self._check_fp()
         table = str(table)
         self._check_table(table)
-        if id >= len(self._db[table]):
-            raise DBError('Modifying of an entry that is not in the database')
+        if len([item for item in self._db[table] if item[0] == id]) == 0:
+            raise DBError('Modifying of an entry that is not in the database.')
         self._db[table][id] = (id, data)
 
     def select(self, table, limit=0):
@@ -501,7 +501,6 @@ class FriDB:
         self._check_fp()
         table = str(table)
         self._check_table(table)
-        # TODO
         if len([item for item in self._db[table] if item[0] == id]) == 0:
             raise DBError('Deleting an entry that doesn\'t exist.')
         self._db[table] = [row for row in self._db[table] if row[0] != id]
