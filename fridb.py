@@ -124,7 +124,11 @@ Tests:
     >>> db.update('customers', 2, 'a newer string')
     Traceback (most recent call last):
       ...
-    fridb.DBError: Modifying of an entry that is not in the database
+    fridb.DBError: Modifying of an entry that is not in the database.
+    >>> db.update('customers', -1, 'a newer string')
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Modifying of an entry that is not in the database.
 
     The data is inserted in the right table.
     >>> db.create_table('orders')
@@ -156,6 +160,27 @@ Tests:
     ['hello, world!', 'a new string', 'item #2']
     >>> db.read('orders')
     ['item #1']
+
+    Delete removes an existing row from an table. All other rows and their IDs
+    remain unchanged. Both the table and the ID must exist.
+    >>> db.delete('customers', 1)
+    >>> db.select('customers')
+    [(0, 'hello, world!'), (2, 'item #2')]
+    >>> db.delete('unknown-table', 0)
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Table does not exist.
+    >>> db.delete('customers', 3)
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Deleting an entry that doesn't exist.
+    >>> db.delete('customers', -1)
+    Traceback (most recent call last):
+      ...
+    fridb.DBError: Deleting an entry that doesn't exist.
+    >>> db.delete('customers', 2)
+    >>> db.select('customers')
+    [(0, 'hello, world!')]
 
     A table can be dropped. The table and its content is no more available.
     >>> db.drop_table('orders')
@@ -193,6 +218,7 @@ Tests:
 """
 import os
 import json
+from _operator import itemgetter
 
 def connect(db_file):
     """
@@ -276,6 +302,7 @@ class FriDB:
         self._file = fp
         self._check_fp()
         self._db = None
+        self._highest_id = {}
         if _get_file_size(fp) == 0:
             self._create_new_db()
         else:
@@ -284,6 +311,7 @@ class FriDB:
     def _create_new_db(self):
         """Create a new database into an empty file."""
         self._db = {}
+        self._highest_id = {}
 
     def _load_db(self):
         """
@@ -293,6 +321,9 @@ class FriDB:
         parsed in that way. If the parser succeeds the private variable '_db'
         is set up with the values of the existing database. On failure a 
         DBError is raised.
+        The JSON is directly loaded into the _db variable, but it cannot
+        differentiate between tuples and lists, so the tuple of ID and content
+        has to be restored manually.
         """
         okay = True
         content = self._file.read()
@@ -300,6 +331,15 @@ class FriDB:
             self._db = json.loads(content)
         except json.JSONDecodeError:
             okay = False
+
+        for table in self._db:
+            self._db[table] = [(row[0], row[1]) for row in self._db[table]]
+
+        for table in self._db:
+            self._highest_id[table] = max(
+                self._db[table],
+                key=lambda item: item[1]
+            )[0]
 
         if not okay:
             raise DBError('Database file corrupt.')
@@ -352,6 +392,7 @@ class FriDB:
         if table in self._db:
             raise DBError('Table already exists.')
         self._db[table] = []
+        self._highest_id[table] = -1
 
     def tables(self):
         """Return a list of all existing tables."""
@@ -384,7 +425,8 @@ class FriDB:
         self._check_fp()
         table = str(table)
         self._check_table(table)
-        self._db[table].append((len(self._db[table]), object))
+        self._db[table].append((self._highest_id[table] + 1, object))
+        self._highest_id[table] += 1
  
     def update(self, table, id, data):
         """
@@ -417,6 +459,7 @@ class FriDB:
         this.
         The difference to read() is that this function returns a tuple
         containing the ID and the data, whereas read() does not.
+        :param table: the table to read from.
         :param limit: This optional parameter specifies the maximum number of
         rows returned.
         :return: An array of tuples containing the ID and the stored data.
@@ -438,6 +481,7 @@ class FriDB:
         Read the entries from the database.
 
         This function is similar to select(), but the IDs are not returned.
+        :param table: the table to read from.
         :param limit: This optional parameter specifies the maximum number of
         rows returned.
         :return: An array containing the stored data.
@@ -445,6 +489,22 @@ class FriDB:
         """
         rows = self.select(table, limit)
         return [row for _, row in rows]
+    
+    def delete(self, table, id):
+        """
+        Deletes an entry from a table.
+
+        
+        :param table: The table to delete the entry from.
+        :param id: The ID of the entry, that should be deleted.
+        """
+        self._check_fp()
+        table = str(table)
+        self._check_table(table)
+        # TODO
+        if len([item for item in self._db[table] if item[0] == id]) == 0:
+            raise DBError('Deleting an entry that doesn\'t exist.')
+        self._db[table] = [row for row in self._db[table] if row[0] != id]
 
     def disconnect(self):
         """
