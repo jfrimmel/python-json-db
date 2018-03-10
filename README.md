@@ -21,6 +21,19 @@ Does not support SQL.
 - [Links](#links)
 
 ## Overview
+This database provides an easy-to-use interface to a single-file database. The
+database does not support SQL, but offers some similar methods, that can be
+called on the database object instead.
+
+The database is stored in a single file. The file format is JSON. Each table
+is represented trough an item/property in the JSON file and has an (maybe
+empty) array as its value. The rows inserted into a table are stored in those
+array one after another (so the order won't be changed, even if the database is
+disconnected and reconnected later).
+
+The database can easily store more than 10,000 entries in a single table. There
+are no limits given by the database (only by the available memory and the run-
+time) for both tables and the rows in a table.
 
 ## Example
 The example creates a simple database to store customers and orders in a shop.
