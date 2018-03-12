@@ -358,15 +358,15 @@ class FriDB:
             self._db = json.loads(content)
         except json.JSONDecodeError:
             okay = False
-
-        for table in self._db:
-            self._db[table] = [(row[0], row[1]) for row in self._db[table]]
-
-        for table in self._db:
-            self._highest_id[table] = max(
-                self._db[table],
-                key=lambda item: item[1]
-            )[0] if len(self._db[table]) != 0 else -1
+        else:
+            for table in self._db:
+                self._db[table] = [(row[0], row[1]) for row in self._db[table]]
+    
+            for table in self._db:
+                self._highest_id[table] = max(
+                    self._db[table],
+                    key=lambda item: item[1]
+                )[0] if len(self._db[table]) != 0 else -1
 
         if not okay:
             raise DBError('Database file corrupt.')
