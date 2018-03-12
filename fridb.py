@@ -361,9 +361,7 @@ class FriDB:
         content = self._file.read()
         try:
             self._db = json.loads(content)
-        except json.JSONDecodeError:
-            okay = False
-        else:
+
             for table in self._db:
                 self._db[table] = [(row[0], row[1]) for row in self._db[table]]
 
@@ -372,7 +370,8 @@ class FriDB:
                     self._db[table],
                     key=lambda item: item[0]
                 )[0]) if self._db[table] else -1
-
+        except (json.JSONDecodeError, TypeError, ValueError):
+            okay = False
         if not okay:
             raise DBError('Database file corrupt.')
 
