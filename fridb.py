@@ -13,8 +13,11 @@ There are several simple methods, that operate on the data. Those are:
 * drop_table(): delete a table with all of its entries
 * tables(): return a list of all tables
 * insert(): insert a data set into a table
+* update(): changes the content of a specified row
+* delete(): delete a specified row
 * read(): query data sets from a table
 * save(): save the memory to the file. Automatically called on disconnect().
+* select(): query data and their IDs from a table
 
 Usage:
     The basic usage is very simple: you have to import this module. After that
@@ -216,6 +219,15 @@ Tests:
     >>> test_10thousand_entries()
     True
 
+    Test, if an empty table initializes the highest ID with the right value.
+    >>> db = create('test.db')
+    >>> db.create_table('test')
+    >>> db.disconnect()
+    >>> db = connect('test.db')
+    >>> db.insert('test', 'item at position 0')
+    >>> db.select('test')
+    [(0, 'item at position 0')]
+
     This is not a test. The following two statements clean up the test
     environment.
     >>> import os
@@ -354,7 +366,7 @@ class FriDB:
             self._highest_id[table] = max(
                 self._db[table],
                 key=lambda item: item[1]
-            )[0]
+            )[0] if len(self._db[table]) != 0 else -1
 
         if not okay:
             raise DBError('Database file corrupt.')
