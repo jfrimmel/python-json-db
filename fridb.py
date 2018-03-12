@@ -135,11 +135,11 @@ Tests:
     The data is inserted in the right table.
     >>> db.create_table('orders')
     >>> db.insert('orders', 'item #1')
-    >>> db.insert('customers', 'item #2')
+    >>> db.insert('customers', 'an item #2')
     >>> db.read('orders', limit=-1)[0]
     'item #1'
     >>> db.read('customers', limit=-1)[0]
-    'item #2'
+    'an item #2'
 
     Ensure that the file object is closed, if the database connection is
     closed. All calls to the public methods of the database object except for
@@ -159,15 +159,19 @@ Tests:
     The existing database has the same entries as the one before the saving.
     >>> db = connect('test.db')
     >>> db.read('customers')
-    ['hello, world!', 'a new string', 'item #2']
+    ['hello, world!', 'a new string', 'an item #2']
     >>> db.read('orders')
     ['item #1']
+    >>> db.insert('customers', '#3')
+    >>> db.select('customers')
+    [(0, 'hello, world!'), (1, 'a new string'), (2, 'an item #2'), (3, '#3')]
+    >>> db.delete('customers', 3)
 
     Delete removes an existing row from an table. All other rows and their IDs
     remain unchanged. Both the table and the ID must exist.
     >>> db.delete('customers', 1)
     >>> db.select('customers')
-    [(0, 'hello, world!'), (2, 'item #2')]
+    [(0, 'hello, world!'), (2, 'an item #2')]
     >>> db.delete('unknown-table', 0)
     Traceback (most recent call last):
       ...
@@ -182,13 +186,13 @@ Tests:
     fridb.DBError: Deleting an entry that doesn't exist.
     >>> db.delete('customers', 0)
     >>> db.select('customers')
-    [(2, 'item #2')]
+    [(2, 'an item #2')]
 
     Update and insert are both working even after the deletion of any items.
     >>> db.update('customers', 2, 'new item #2')
     >>> db.insert('customers', 'item #3')
     >>> db.select('customers')
-    [(2, 'new item #2'), (3, 'item #3')]
+    [(2, 'new item #2'), (4, 'item #3')]
 
     A table can be dropped. The table and its content is no more available.
     >>> db.drop_table('orders')
@@ -227,6 +231,7 @@ Tests:
     >>> db.insert('test', 'item at position 0')
     >>> db.select('test')
     [(0, 'item at position 0')]
+    >>> db.disconnect()
 
     This is not a test. The following two statements clean up the test
     environment.
@@ -365,7 +370,7 @@ class FriDB:
             for table in self._db:
                 self._highest_id[table] = int(max(
                     self._db[table],
-                    key=lambda item: item[1]
+                    key=lambda item: item[0]
                 )[0]) if self._db[table] else -1
 
         if not okay:
