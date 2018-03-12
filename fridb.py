@@ -361,12 +361,12 @@ class FriDB:
         else:
             for table in self._db:
                 self._db[table] = [(row[0], row[1]) for row in self._db[table]]
-    
+
             for table in self._db:
-                self._highest_id[table] = max(
+                self._highest_id[table] = int(max(
                     self._db[table],
                     key=lambda item: item[1]
-                )[0] if len(self._db[table]) != 0 else -1
+                )[0]) if self._db[table] else -1
 
         if not okay:
             raise DBError('Database file corrupt.')
