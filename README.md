@@ -129,6 +129,11 @@ This is roughly equivalent to the SQL
 query all statements, with the option to limit the number of rows returned.
 Currently you cannot specify a filter in the statement.
 
+### select
+Similar to read(), but for each row a tuple of two is returned, where the first
+entry is the ID and the second one is the data. This can be used for specifing
+an entry in a table (e.g. for updating or deleting).
+
 ### insert
 Insert a new data set into a table. It is always inserted at the end of the
 table entries.
@@ -139,10 +144,19 @@ memory. The change is written if save() or disconnect() is called.
 This is the equivalent to the SQL command `INSERT ... INTO TABLE ...`.
 
 ### delete
-This is not implemented yet.
+Delete an entry from a table.
+
+This method removes a row with a given ID from the database. The same
+circumstances as by insert() apply.
 
 ### update
-This is not implemented yet.
+Update an existing row with new data.
+
+The row has to be existent. It is identified over the ID of the row,
+which can be queried using select(). It throws an DBError if the ID is not in
+the table or the table doesn't exists.
+
+This is the limited equivalent to the SQL `UPDATE` statement.
 
 ## Testing
 The module is tested using the python module 'doctest'. The docstrings for the
